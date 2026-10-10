@@ -109,6 +109,8 @@ public:
     void createNewNote();                                           //新建便签
     void openMemoWithId(int noteId);
     quint32 getWindowId(void);
+    QSize preferredEditorSize() const;
+    void rememberEditorSize(const QSize &size);
 public slots:
     void sltMessageReceived(/*const QString &msg*/);                //接收socket信息
     void textForNewEditpageSigReceived();                           //将选中内容复制到新便签页功能的内容传递函数
@@ -127,6 +129,9 @@ private:
     QAction *m_searchAction;                                          //搜索栏图标
     QAction *delAction;                                             //搜索栏删除图标
     QTimer* m_autoSaveTimer;                                        //自动保存定时器
+    QTimer* m_editorSizeSaveTimer;
+    QSize m_editorWindowSize{300, 280};
+    bool m_editorSizeDirty = false;
     QSettings* m_settingsDatabase;                                  //配置文件
     QLineEdit* m_searchLine;                                        //搜索栏
     QPushButton* m_newKynote;                                       //新建按钮
@@ -174,6 +179,7 @@ private:
     void deleteSelectedNote();                                      //获取选中便签/列表
     void setupDatabases();                                          //配置数据库
     void initializeSettingsDatabase();                              //初始化配置文件
+    void saveEditorWindowSize();
     void createNewNoteIfEmpty();                                    //初始时创建一个便签
     void setupListModeModel();                                      //代理列表模板
     void setupIconModeModel();                                      //代理图标模板

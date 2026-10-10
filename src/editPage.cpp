@@ -24,6 +24,10 @@
 #include <QDebug>
 #include <QFileDialog>
 #include <QImageReader>
+#include <QResizeEvent>
+#include <QTimer>
+#include <QScreen>
+#include <QWindow>
 
 #include <KWindowSystem>
 // Necessary for closeApplication()
@@ -62,6 +66,137 @@ EditPage::EditPage(Widget *page, int noteId, QWidget *parent) :
 EditPage::~EditPage()
 {
     delete ui;
+}
+
+void EditPage::showWithRememberedSize()
+{
+    if (isVisible()) {
+        QWidget::show();
+        return;
+    }
+
+    m_restoringSize = true;
+    const quint64 generation = ++m_restoreGeneration;
+    const Qt::WindowStates previousState = windowState();
+    const bool wasSpecialState = previousState & (Qt::WindowMinimized | Qt::WindowMaximized | Qt::WindowFullScreen);
+    m_reopenNormalState = wasSpecialState;
+    if (!m_lastNormalSize.isValid() || !wasSpecialState)
+        m_lastNormalSize = size();
+    if (wasSpecialState) {
+        setWindowState(Qt::WindowNoState);
+        m_isFullscreen = false;
+    }
+    QSize restoredSize = m_notebook ? m_notebook->preferredEditorSize() : QSize(300, 280);
+    QScreen *screen = windowHandle() ? windowHandle()->screen() : QGuiApplication::primaryScreen();
+    if (screen) {
+        restoredSize = restoredSize.boundedTo(screen->availableGeometry().size()
+                                              .expandedTo(minimumSize()));
+    }
+    m_restoredSize = restoredSize.expandedTo(minimumSize());
+    // Send the resize after the map request. KWin can retain the previous
+    // native geometry when a hidden editor object is reused.
+    QWidget::show();
+    if (wasSpecialState) {
+        // Hidden QWindow state changes can be superseded by retained X11
+        // state on remapping. Clear it after the map request as well.
+        KWindowSystem::clearState(winId(), NET::Max | NET::FullScreen);
+    }
+    resize(m_restoredSize);
+    m_restoringSize = false;
+    QTimer::singleShot(300, this, [this, generation]() {
+        // A successful map may not emit a resize event when the size already
+        // matches. Expire the acknowledgement guard after mapping settles.
+        if (generation != m_restoreGeneration)
+            return;
+        if (!(windowState() & (Qt::WindowMinimized | Qt::WindowMaximized | Qt::WindowFullScreen))) {
+            m_reopenNormalState = false;
+            if (m_restoredSize.isValid() && size() == m_restoredSize) {
+                m_lastNormalSize = size();
+                m_restoredSize = QSize();
+            }
+        }
+    });
+}
+
+void EditPage::changeEvent(QEvent *event)
+{
+    QWidget::changeEvent(event);
+    if (event->type() != QEvent::WindowStateChange)
+        return;
+    if (!event->spontaneous() && isVisible() && !m_restoringSize) {
+        // An explicit state change on an open editor belongs to the user.
+        m_reopenNormalState = false;
+    } else if (event->spontaneous() && m_reopenNormalState && isVisible()
+               && (windowState() & (Qt::WindowMinimized | Qt::WindowMaximized | Qt::WindowFullScreen))) {
+        const quint64 generation = m_restoreGeneration;
+        QTimer::singleShot(0, this, [this, generation]() {
+            if (generation != m_restoreGeneration || !m_reopenNormalState || !isVisible())
+                return;
+            m_reopenNormalState = false;
+            m_restoringSize = true;
+            showNormal();
+            KWindowSystem::clearState(winId(), NET::Max | NET::FullScreen);
+            resize(m_restoredSize.isValid() ? m_restoredSize : m_lastNormalSize);
+            m_restoringSize = false;
+        });
+    }
+}
+
+void EditPage::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    if (m_restoringSize || !isVisible()
+            || (windowState() & (Qt::WindowMinimized | Qt::WindowMaximized | Qt::WindowFullScreen)))
+        return;
+
+    // Ignore the old geometry and the requested geometry reported by X11
+    // during remapping. A different size is a new normal resize.
+    if (m_restoredSize.isValid() && event->spontaneous()) {
+        if (event->size() == m_lastNormalSize)
+            return;
+        if (event->size() == m_restoredSize) {
+            m_lastNormalSize = event->size();
+            m_restoredSize = QSize();
+            return;
+        }
+    }
+    m_restoredSize = QSize();
+
+    // Returning from a window state change restores the last normal geometry;
+    // it must not overwrite a newer size chosen in another editor.
+    if (event->size() != m_lastNormalSize) {
+        m_lastNormalSize = event->size();
+        if (m_notebook)
+            m_notebook->rememberEditorSize(event->size());
+    }
+}
+
+void EditPage::showAnchoredPopup(QWidget *popup, QWidget *button, bool preferAbove)
+{
+    const QRect anchor(button->mapToGlobal(QPoint(0, 0)), button->size());
+    QScreen *screen = QGuiApplication::screenAt(anchor.center());
+    if (!screen)
+        screen = windowHandle() ? windowHandle()->screen() : QGuiApplication::primaryScreen();
+
+    const int gap = 4;
+    const int above = anchor.top() - popup->height() - gap;
+    const int below = anchor.bottom() + 1 + gap;
+    QPoint position(anchor.left(), preferAbove ? above : below);
+    if (screen) {
+        const QRect available = screen->availableGeometry();
+        const bool fitsAbove = above >= available.top();
+        const bool fitsBelow = below + popup->height() <= available.bottom() + 1;
+        if (preferAbove && !fitsAbove && fitsBelow)
+            position.setY(below);
+        else if (!preferAbove && !fitsBelow && fitsAbove)
+            position.setY(above);
+        position.setX(qBound(available.left(), position.x(),
+                            qMax(available.left(), available.right() + 1 - popup->width())));
+        position.setY(qBound(available.top(), position.y(),
+                            qMax(available.top(), available.bottom() + 1 - popup->height())));
+    }
+    popup->move(position);
+    popup->show();
 }
 
 void EditPage::paintEvent(QPaintEvent *event)
@@ -138,6 +273,8 @@ void EditPage::initSetup()
 
 void EditPage::btnSetup()
 {
+    ui->fontColorBtn->setAttribute(Qt::WA_TransparentForMouseEvents);
+    ui->fontColorBtn->setFocusPolicy(Qt::NoFocus);
     ui->unorderedBtn->setIcon(QIcon::fromTheme("view-list-symbolic"));
     ui->strikeOutBtn->setIcon(QIcon::fromTheme("format-text-strikethrough-symbolic"));
     ui->orderedBtn->setIcon(QIcon::fromTheme("ukui-view-list-numbe-symbolic"));
@@ -211,9 +348,7 @@ void EditPage::slotsSetup()
     connect(ui->textEdit, &QTextEdit::textChanged, this, &EditPage::textChangedSlot);
     // 调色板菜单
     connect(m_noteHeadMenu->ui->pushButtonPalette, &QPushButton::clicked, this, [=](){
-        QPointF position = this->pos();
-        m_colorPage->move(position.x()+30, position.y()+34);
-        m_colorPage->show();
+        showAnchoredPopup(m_colorPage, m_noteHeadMenu->ui->pushButtonPalette, false);
     });
     // 调色按钮
     connect(m_colorPage->paletteWidget->ui->blueBtn, &QPushButton::clicked, this,
@@ -251,42 +386,7 @@ void EditPage::slotsSetup()
             &EditPage::currentCharFormatChangedSlot);
 
     connect(ui->fontSizeBtn, &QPushButton::clicked, this, [=](){
-
-        QPointF position = this->pos();
-        m_setSizePage->move(position.x()+227, position.y()+273);
-
-        QDesktopWidget* desktopWidget = QApplication::desktop();
-        QRect clientRect = desktopWidget->availableGeometry();                                   //获取整个屏幕（不包含任务栏）的rect数据
-
-        int listHeight = 194;                                                                    //listwidget 原始高度
-        int heightListCrossPeny = listHeight + m_setSizePage->pos().y() - clientRect.height();   //listwidget 超出任务栏显示的高度， 不超出时， 该数字为负数
-
-        if(heightListCrossPeny > 0)                                                              //listwidget 超出任务栏显示
-        {
-            int fontButtonHeight = 27;                                                           //每个fontbutton高度,当前为27
-            int keepNum = listHeight - heightListCrossPeny;                                      //listwidget 未超出任务栏显示的高度
-            int realNum = keepNum - (keepNum % fontButtonHeight);                                //最后，实际显示的高度，应该是每个fontbutton高度（27）的整数倍，小于27时，为0
-
-            //listWidget 向下显示，高度不够，此时，显示到set_size_page的上面
-            if(realNum == 0){
-               m_setSizePage->move(position.x()+227, position.y()+53);
-               m_setSizePage->resize(30,194);
-               m_setSizePage->ui->listWidget->resize(30,194);
-               //set_size_page->ui->listWidget->sortItems(Qt::DescendingOrder);                 //倒序，但是数据会混乱，暂缓
-            }
-            else{
-               m_setSizePage->resize(30, realNum);
-               m_setSizePage->ui->listWidget->resize(30, realNum);
-            }
-        }
-        else
-        {
-            m_setSizePage->move(position.x()+227, position.y()+273);
-            m_setSizePage->resize(30,194);
-            m_setSizePage->ui->listWidget->resize(30,194);
-        }
-
-        m_setSizePage->show();
+        showAnchoredPopup(m_setSizePage, ui->fontSizeBtn, true);
     });
     connect(ui->styleBtn, &QPushButton::clicked, this, &EditPage::onFontColorClicked);
     connect(m_noteHeadMenu, &noteHeadMenu::requestUpdateMenuIcon, this, [=](){
@@ -974,11 +1074,5 @@ void EditPage::defaultTextColorSlot()
 
 void EditPage::onFontColorClicked()
 {
-    QPointF position = this->pos();
-    QSize size = this->size();
-    qDebug () << "Current size:" << size;
-    m_setColorFontPage->move(position.x()+size.width() - 168 - 8 , position.y() + size.height() - 70);
-    //m_setColorFontPage->resize(300,30);
-    //m_setColorFontPage->ui->listWidget->resize(300,30);
-    m_setColorFontPage->show();
+    showAnchoredPopup(m_setColorFontPage, ui->styleBtn, true);
 }

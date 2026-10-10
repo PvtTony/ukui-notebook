@@ -77,10 +77,21 @@ public:
     Qt::WindowFlags m_flags;
     void setStayOnTopSlot(bool b);
     void setHints();
+    void showWithRememberedSize();
     void setWindowKeepAbove();
     void setWindowStatusClear();
 
+protected:
+    void resizeEvent(QResizeEvent *event) Q_DECL_OVERRIDE;
+    void changeEvent(QEvent *event) Q_DECL_OVERRIDE;
+
 private:
+    void showAnchoredPopup(QWidget *popup, QWidget *button, bool preferAbove);
+    bool m_restoringSize = true;
+    bool m_reopenNormalState = false;
+    QSize m_restoredSize;
+    quint64 m_restoreGeneration = 0;
+    QSize m_lastNormalSize;
     void initSetup();                                                // 初始配置
     void slotsSetup();                                               // 配置槽函数
     void btnSetup();                                                 // 初始化按钮

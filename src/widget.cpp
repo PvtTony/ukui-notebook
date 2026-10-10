@@ -42,6 +42,7 @@ Widget::Widget(QWidget *parent) :
     m_noteExitWindow(new noteExitWindow(this, this)),
     m_emptyNotes(Q_NULLPTR),
     m_autoSaveTimer(new QTimer(this)),
+    m_editorSizeSaveTimer(new QTimer(this)),
     m_settingsDatabase(Q_NULLPTR),
     m_searchLine(Q_NULLPTR),
     m_newKynote(Q_NULLPTR),
@@ -85,6 +86,10 @@ Widget::Widget(QWidget *parent) :
     ui->setupUi(this);
     m_noteView = static_cast<NoteView *>(ui->listView);
     setupDatabases();
+    m_editorSizeSaveTimer->setSingleShot(true);
+    m_editorSizeSaveTimer->setInterval(300);
+    connect(m_editorSizeSaveTimer, &QTimer::timeout, this, &Widget::saveEditorWindowSize);
+    connect(qApp, &QCoreApplication::aboutToQuit, this, &Widget::saveEditorWindowSize);
     listenToGsettings();
     kyNoteInit();
     kyNoteConn();
@@ -99,6 +104,7 @@ Widget::Widget(QWidget *parent) :
  */
 Widget::~Widget()
 {
+    saveEditorWindowSize();
     for (auto it = m_editors.begin(); it != m_editors.end(); it++) {
         (*it)->close();
         delete *it;
@@ -199,6 +205,11 @@ void Widget::setupIconModeModel()
  */
 void Widget::initializeSettingsDatabase()
 {
+    const QSize minimumEditorSize(300, 280);
+    QSize savedSize = m_settingsDatabase->value(QStringLiteral("editorWindowSize"),
+                                               minimumEditorSize).toSize();
+    m_editorWindowSize = savedSize.isEmpty() ? minimumEditorSize
+                                           : savedSize.expandedTo(minimumEditorSize);
     if (m_settingsDatabase->value(QStringLiteral("version"), "NULL") == "NULL")
         m_settingsDatabase->setValue(QStringLiteral("version"), qApp->applicationVersion());
 
@@ -210,6 +221,35 @@ void Widget::initializeSettingsDatabase()
         setGeometry(rect);      // 设置窗口居中
         m_settingsDatabase->setValue(QStringLiteral("windowGeometry"), saveGeometry());     // 保存窗口的几何形状
     }
+}
+
+QSize Widget::preferredEditorSize() const
+{
+    return m_editorWindowSize;
+}
+
+void Widget::rememberEditorSize(const QSize &size)
+{
+    if (size.width() < 300 || size.height() < 280 || size == m_editorWindowSize)
+        return;
+
+    m_editorWindowSize = size;
+    m_editorSizeDirty = true;
+    m_editorSizeSaveTimer->start();
+}
+
+void Widget::saveEditorWindowSize()
+{
+    if (!m_editorSizeDirty || !m_settingsDatabase)
+        return;
+
+    m_editorSizeSaveTimer->stop();
+    m_settingsDatabase->setValue(QStringLiteral("editorWindowSize"), m_editorWindowSize);
+    m_settingsDatabase->sync();
+    if (m_settingsDatabase->status() == QSettings::NoError)
+        m_editorSizeDirty = false;
+    else
+        qWarning() << "Failed to save editor window size";
 }
 
 /*!
@@ -621,7 +661,7 @@ void Widget::openMemoWithId(int noteId)
         m_notebook->ui->textEdit->setFocus();
         // 移动光标至行末
         m_notebook->ui->textEdit->moveCursor(QTextCursor::End, QTextCursor::MoveAnchor);
-        m_notebook->show();
+        m_notebook->showWithRememberedSize();
     });
 }
 
@@ -1016,7 +1056,7 @@ void Widget::createNewNote()
         m_notebook->ui->textEdit->setText(originalText);
         m_isTextCpNew = false;
     }
-    m_notebook->show();
+    m_notebook->showWithRememberedSize();
     m_notebook->m_noteHead->hide();
     m_notebook->m_noteHeadMenu->show();
 }
@@ -1504,7 +1544,7 @@ void Widget::listDoubleClickSlot(const QModelIndex &index)
     // 移动光标至行末
     m_notebook->ui->textEdit->moveCursor(QTextCursor::End, QTextCursor::MoveAnchor);
     m_notebook->setHints();
-    m_notebook->show();
+    m_notebook->showWithRememberedSize();
 }
 
 /*!
@@ -1648,7 +1688,7 @@ void Widget::sltMessageReceived(/*const QString &msg*/)
 
     if(this->isHidden())
     {
-        this->m_notebook->show();
+        this->m_notebook->showWithRememberedSize();
         this->m_notebook->activateWindow();
         this->m_notebook->raise();
     }
