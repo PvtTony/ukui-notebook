@@ -19,7 +19,6 @@
 #include "widget.h"
 #include "ui_widget.h"
 #include "editPage.h"
-#include "information_collector.h"
 #include "windowmanage.hpp"
 
 /*!
@@ -740,7 +739,6 @@ void Widget::setListFlag(const int &listflag)
  */
 void Widget::initIconMode()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::IconMode);
     qDebug() << "当前函数 :" << __FUNCTION__ << "当前行号 :" << __LINE__;
     m_noteView->setViewMode(QListView::IconMode);
     m_noteView->setSelectionMode(QListView::ExtendedSelection);
@@ -759,7 +757,6 @@ void Widget::initIconMode()
  */
 void Widget::initListMode()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::ListMode);
     qDebug() << "当前函数 :" << __FUNCTION__ << "当前行号 :" << __LINE__;
     // 列表模式
     m_noteView->setViewMode(QListView::ListMode);
@@ -788,7 +785,6 @@ void Widget::initListMode()
  */
 void Widget::deleteNote(const QModelIndex &noteIndex, bool isFromUser)
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::Delete);
     qDebug() << "当前函数 :" << __FUNCTION__ << "当前行号 :" << __LINE__;
     if (noteIndex.isValid()) {
         // delete from model
@@ -825,7 +821,6 @@ void Widget::deleteNote(const QModelIndex &noteIndex, bool isFromUser)
  */
 void Widget::deleteSelectedNote()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::DeleteCurrent);
     qDebug() << "当前函数 :" << __FUNCTION__ << "当前行号 :" << __LINE__;
     if (!m_isOperationRunning) {
         m_isOperationRunning = true;
@@ -934,7 +929,6 @@ void Widget::createNewNoteIfEmpty()
  */
 void Widget::createNewNote()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::NewNote);
     qDebug() << "当前函数 :" << __FUNCTION__ << "当前行号 :" << __LINE__;
     if (!m_isOperationRunning) {
         m_isOperationRunning = true;
@@ -1328,7 +1322,6 @@ void Widget::onTextEditTextChanged(int noteId, int i)
  */
 void Widget::onColorChanged(const QColor &color, int noteId)
 {
-    InformationCollector::getInstance().addMessage(QString("set widget color to %1.").arg(color.name()));
     qDebug() << "receive signal onColorChanged";
     for (int count = 0; count <= m_proxyModel->rowCount(); count++) {
         m_tmpColorIndex = m_proxyModel->index(count, 0);
@@ -1520,7 +1513,6 @@ void Widget::listDoubleClickSlot(const QModelIndex &index)
  */
 void Widget::onSearchEditTextChanged(const QString &keyword)
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::Search);
     qDebug() << "onSearchEditTextChanged";
     m_searchQueue.enqueue(keyword);
 
@@ -1561,7 +1553,6 @@ void Widget::onSearchEditTextChanged(const QString &keyword)
  */
 void Widget::changePageSlot()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::ModeChange);
     if (getListFlag() != 0) {
         initIconMode();
         m_viewChangeButton->setIcon(QIcon::fromTheme("view-list-symbolic"));

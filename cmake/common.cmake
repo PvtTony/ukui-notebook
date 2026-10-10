@@ -6,11 +6,6 @@ function(target_link_kysdk_libraries prj_name)
     target_link_directories(${prj_name} PRIVATE ${KYSDKQTWIDGETS_PKG_LIBRARY_DIRS})
     target_link_libraries(${prj_name} Qt5::Widgets ${KYSDKQTWIDGETS_PKG_LIBRARIES})
 
-    pkg_check_modules(KYSDKDIAGNOSTICS_PKG kysdk-diagnostics)
-    target_include_directories(${prj_name} PRIVATE ${KYSDKDIAGNOSTICS_PKG_INCLUDE_DIRS})
-    target_link_directories(${prj_name} PRIVATE ${KYSDKDIAGNOSTICS_PKG_LIBRARY_DIRS})
-    target_link_libraries(${prj_name}  ${KYSDKDIAGNOSTICS_PKG_LIBRARIES})
-
     pkg_check_modules(KYSDKLOG_PKG kysdk-log)
     target_include_directories(${prj_name} PRIVATE ${KYSDKLOG_PKG_INCLUDE_DIRS})
     target_link_directories(${prj_name} PRIVATE ${KYSDKLOG_PKG_LIBRARY_DIRS})

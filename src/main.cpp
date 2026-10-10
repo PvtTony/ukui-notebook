@@ -24,7 +24,6 @@
 #include <QApplication>
 
 #include "log.h"
-#include "information_collector.h"
 #include "windowmanage.hpp"
 
 /*!
@@ -37,7 +36,6 @@ int main(int argc, char *argv[])
 #else
     qInstallMessageHandler(myMessageOutput);
 #endif
-    InformationCollector::getInstance().addMessage("便签应用启动!");
 
     //高清屏幕自适应,适配990高DPI
     kabase::WindowManage::setScalingProperties();

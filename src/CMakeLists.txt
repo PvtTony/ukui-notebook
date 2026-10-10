@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")
 
-option(TEST_DEBUG "option for debug" OFF)
+option(TEST_DEBUG "Use console logging for debugging" OFF)
 
 if (TEST_DEBUG) 
 	add_definitions(-DTEST_DEBUG)

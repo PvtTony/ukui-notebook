@@ -34,7 +34,6 @@
 #include "editPage.h"
 #include "ui_editPage.h"
 #include "windowmanage.hpp"
-#include "information_collector.h"
 
 extern void qt_blurImage(QImage &blurImage, qreal radius, bool quality, int transposed);
 
@@ -316,7 +315,6 @@ void EditPage::slotsSetup()
     });
 
     connect(m_noteHeadMenu, &noteHeadMenu::requestTopMost, this, [=](){
-        InformationCollector::getInstance().addPoint(InformationCollector::UiTop);
          KWindowInfo info(this->winId(), NET::WMState);
          bool b = info.state() & NET::KeepAbove;
 
@@ -605,7 +603,6 @@ void EditPage::textForNewEditpageSlot()
 // 加粗
 void EditPage::setBoldSlot()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::Bold);
     qDebug() << "setBoldSlot";
     QTextCharFormat fmt;
     fmt.setFontWeight(ui->boldBtn->isCheckable() ? QFont::Bold : QFont::Normal);
@@ -625,7 +622,6 @@ void EditPage::setBoldSlot()
 // 斜体
 void EditPage::setItalicSlot()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::Italics);
     qDebug()<<"-------setItalicSlot------------";
     QTextCharFormat fmt;
     fmt.setFontItalic(ui->italicBtn->isCheckable());// ? QFont::StyleItalic : QFont::Normal);
@@ -644,7 +640,6 @@ void EditPage::setItalicSlot()
 // 划线
 void EditPage::setUnderlineSlot()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::Underline);
     qDebug() << "setUnderlineSlot";
     QTextCharFormat fmt;
     fmt.setFontUnderline(ui->underlineBtn->isCheckable());// ? QFont::UnderlineResolved : QFont::Normal );
@@ -662,7 +657,6 @@ void EditPage::setUnderlineSlot()
 // 除线
 void EditPage::setStrikeOutSlot()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::Deleteline);
     qDebug() << "setStrikeOutSlot";
     QTextCharFormat fmt;
     fmt.setFontStrikeOut(ui->strikeOutBtn->isCheckable());// ? QFont::StrikeOutResolved : QFont::Normal );
@@ -682,7 +676,6 @@ void EditPage::setUnorderedListSlot(bool checked)
 {
     qDebug() << "setUnorderedListSlot" << checked;
     if (checked) {
-        InformationCollector::getInstance().addPoint(InformationCollector::UnorderList);
         ui->orderedBtn->setChecked(false);
         qDebug() << "show list set false" << checked;
         qDebug() << "text_edit_page->ui->orderedBtn is checked ? :" << ui->orderedBtn->isChecked();
@@ -696,7 +689,6 @@ void EditPage::setOrderedListSlot(bool checked)
 {
     qDebug() << "show num list";
     if (checked) {
-        InformationCollector::getInstance().addPoint(InformationCollector::OrderList);
         ui->unorderedBtn->setChecked(false);
     }
     list(checked, QTextListFormat::ListDecimal);
@@ -711,7 +703,6 @@ void EditPage::setFontSizeSlot()
     m_setSizePage->close();
     update();
     QTextCharFormat fmt;
-    InformationCollector::getInstance().addMessage(QString("set font size to %1.").arg(num+10));
     fmt.setFontPointSize(num+10);
     mergeFormatOnWordOrSelection(fmt);
 }
@@ -733,7 +724,6 @@ void EditPage::setFontColorSlot(QListWidgetItem *item)
     int num = m_setColorFontPage->ui->listWidget->currentRow();
     QTextCharFormat fmt;
     if (num != 5) {
-        InformationCollector::getInstance().addMessage(QString("set font color to %1.").arg(m_colorNum[num].name()));
         m_defaultFontColorChanged = true;
         fmt.setForeground(m_colorNum[num]);
         ui->textEdit->mergeCurrentCharFormat(fmt);
@@ -957,7 +947,6 @@ void EditPage::dropImage(const QImage& image, const QString& format) {
 
 void EditPage::insertpicture()
 {
-    InformationCollector::getInstance().addPoint(InformationCollector::InsertPicture);
         QSettings s;
         QString attdir = s.value("general/filedialog-path").toString();
         QString file = QFileDialog::getOpenFileName(this,
