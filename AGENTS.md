@@ -62,9 +62,28 @@ ssh yst@192.168.65.9 'cd ~/ukui-notebook && cmake -S . -B build -DCMAKE_BUILD_TY
 
 `-DTEST_DEBUG=ON` 将应用的 Qt 日志处理切换为控制台调试输出；它不是测试套件，也不会绕过 Qt 或 SDK 依赖。项目不再使用该宏控制埋点，也没有启用 Telemetry 的开关。
 
-依赖缺失时在远端通过 `apt` 安装对应开发包，包名参考 `debian/control`；先检查软件源中的可用版本和安装计划。Debian 打包可在依赖齐全的远端使用 `dpkg-buildpackage -us -uc -b`。安装规则使用绝对的 `/usr`、`/etc` 路径；验证安装布局时使用临时 `DESTDIR` 暂存目录，不要仅靠修改 `CMAKE_INSTALL_PREFIX`。
+依赖缺失时在远端通过 `apt` 安装对应开发包，包名参考 `debian/control`；先检查软件源中的可用版本和安装计划。Debian 打包可在依赖齐全的远端使用 `dpkg-buildpackage -us -uc -b`，也可使用下述不依赖 debhelper 的打包脚本。安装规则使用绝对的 `/usr`、`/etc` 路径；验证安装布局时使用临时 `DESTDIR` 暂存目录，不要仅靠修改 `CMAKE_INSTALL_PREFIX`。
 
 缺少依赖时，记录失败阶段、命令和实际错误。Qt 查找失败后可能落入旧版 `FindQt` 并显示 Qt3 错误；应先检查 Qt 5 配置和查找路径，不要把该报错视为项目需要 Qt3。不要为了让当前主机配置通过而移除 Linux/SDK 依赖。
+
+## Release 安装包与离线交付
+
+`debian/package-binary.sh` 在麒麟主机生成 Release `.deb`：编译两个程序、生成全部 `.ts` 对应的翻译、使用 `DESTDIR` 暂存安装文件，并用 `dpkg-shlibdeps` 和 `dpkg-gencontrol` 计算依赖及包元数据。需要已有构建依赖、dpkg-dev 和 binutils，不需要 sudo 或 debhelper；默认输出目录为 `build/package/`，也可传入其他输出目录。
+
+```sh
+ssh yst@192.168.65.9 'cd ~/ukui-notebook && bash debian/package-binary.sh'
+ssh yst@192.168.65.9 'cd ~/ukui-notebook && bash debian/package-offline.sh'
+```
+
+第二条命令用临时空包数据库解析完整依赖，以仅下载方式收集 `.deb`，生成本地 APT 软件源、安装脚本、版本清单及 SHA256 校验值，输出 `ukui-notebook-offline_<版本>_<架构>.tar.gz`。它不会安装或升级编译机的软件包。依赖集合包含基础包，不能直接对全部 `.deb` 执行 `dpkg -i`，以免把已满足要求的目标机依赖强制覆盖为所收集的版本。
+
+当前离线安装脚本针对麒麟 V10-JICAI、arm64；目标机必须核对发行版本和架构。解压后先完全退出便签，建议备份用户的 `~/.config/kylin-note/`，然后执行 `sudo bash install-offline.sh --simulate` 查看计划，再执行 `sudo bash install-offline.sh` 安装。脚本只使用本地 `file:` 软件源，并设置 `--no-download`、`--no-remove`，保留版本已经满足要求的系统依赖；其他发行版或有冲突的包状态需要重新验证。
+
+版本以 `debian/changelog` 为准。当前本地发行版为 `3.2.0-0k9+local1`，可升级已安装的 `3.1.1-1`。这两次功能修改未引入额外库，但当前源码相对旧 `3.1.1-1` 二进制已经使用麒麟 SDK，不能据此假定旧包的运行依赖足够；以生成包的 `Depends` 为准。SQLite 驱动 `libqt5sql5-sqlite` 是原有运行要求，现在显式声明。
+
+旧版 `postrm` 会在升级时误删 `/home/*/.config/ukui/Clock_database.db` 和 `url.conf`。当前 `preinst` 为旧版本备份这两类文件，`postinst` 恢复缺失文件，`postrm` 在升级失败回退时也恢复备份；保留文件属性及符号链接，不覆盖升级期间重新生成的文件。新的卸载和清除操作不删除用户便签数据。维护这些脚本时，在隔离根目录验证真实 dpkg 调用顺序、重试、失败恢复、配置文件保留和卸载；不要在真实用户目录模拟旧脚本的删除逻辑。
+
+离线交付应验证包内容、翻译、依赖缓存完整性、断网依赖解析及隔离升级，再运行打包后的程序进行冒烟验证。明确区分依赖模拟与实际安装，不把编译机上的成功等同于另一台机器已验证。用户要求交付安装包时，可把 `.deb`、离线压缩包和校验文件回传到本机 `build/package/`，不要提交这些产物。
 
 ## 构建副作用与生成文件
 
@@ -89,7 +108,7 @@ ssh yst@192.168.65.9 'cd ~/ukui-notebook && cmake -S . -B build -DCMAKE_BUILD_TY
 - 新增或修改 SQL 查询优先使用 `prepare()` 与绑定参数，并检查查询错误、空输入、引号及 Unicode；不要扩展现有手工拼接用户输入的模式。
 - D-Bus 公共契约：会话总线服务 `org.ukui.note`，对象 `/org/ukui/note`，接口 `org.ukui.note.interface`，方法 `keywordMatch(QStringList)` 返回 `QVariantMap`。接口、返回结构、激活文件及调用方应协调修改。
 - 窗口操作同时涉及 `src/common/windowmanage.hpp` 和 `EditPage` 中的 KF5 调用。修改置顶、激活或缩放时检查 X11 与 Wayland，保留桌面入口的绝对 `Exec` 路径及 `X-KDE-Wayland-Interfaces` 声明。
-- `debian/control` 的部分描述/链接仍指向 ukui-sidebar；理解真实项目时以源码和构建目标为准，包装元数据修复应作为相关任务明确处理。
+- `debian/control` 的描述和仓库链接已修正为便签项目；对旧 `ukui-sidebar` 的冲突声明沿用现有兼容约定，修改前核对是否会造成目标机文件冲突或删除其他桌面组件。
 
 ## 翻译流程
 

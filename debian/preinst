@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+    install|upgrade) ;;
+    *) exit 0 ;;
+esac
+
+# Legacy postrm scripts also run on upgrade and delete these unrelated files.
+# Only essential tools are available before the new package is unpacked.
+[ -n "${2:-}" ] || exit 0
+dpkg --compare-versions "$2" le 3.2.0-0k9 || exit 0
+
+root=${DPKG_ROOT:-}
+backup="$root/var/lib/ukui-notebook/legacy-postrm-backup"
+umask 077
+for file in "$root"/home/*/.config/ukui/Clock_database.db \
+            "$root"/home/*/.config/ukui/url.conf; do
+    [ -f "$file" ] || continue
+    relative=${file#"$root"/}
+    saved="$backup/$relative"
+    # Keep the first backup if dpkg retries an interrupted upgrade.
+    if [ ! -e "$saved" ] && [ ! -L "$saved" ]; then
+        mkdir -p "$(dirname "$saved")"
+        cp -a -- "$file" "$saved"
+    fi
+done
+
+#DEBHELPER#

@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: ukui-sidebar
+Upstream-Name: ukui-notebook
 Upstream-Contact: chenchunan@kylinos.cn
-Source: https://github.com/ukui/ukui-sidebar
+Source: https://github.com/PvtTony/ukui-notebook
 
 Files: *
 Copyright: 2020, Tianjin KYLIN Information Technology Co., Ltd.

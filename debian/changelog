@@ -1,3 +1,13 @@
+ukui-notebook (3.2.0-0k9+local1) unstable; urgency=medium
+
+  * Remove telemetry collection and its diagnostics dependency.
+  * Support resizable note editors and remember the latest editor size.
+  * Package application translations and declare the SQLite driver dependency.
+  * Correct package metadata and provide a rootless binary packaging script.
+  * Preserve user configuration affected by the legacy postrm during upgrades.
+
+ -- PvtTony <yusongtao518@outlook.com>  Sat, 10 Oct 2026 14:46:48 +0800
+
 ukui-notebook (3.2.0-0k9) v101; urgency=medium
 
   * BUG #126790 【云桌面】【便签本】只插入图片然后删除图片，便签本还是显示picture，内容没有清空

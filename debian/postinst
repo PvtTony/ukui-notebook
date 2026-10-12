@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+    configure) ;;
+    *) exit 0 ;;
+esac
+
+root=${DPKG_ROOT:-}
+backup="$root/var/lib/ukui-notebook/legacy-postrm-backup"
+if [ -d "$backup" ]; then
+    for saved in "$backup"/home/*/.config/ukui/Clock_database.db \
+                 "$backup"/home/*/.config/ukui/url.conf; do
+        [ -f "$saved" ] || [ -L "$saved" ] || continue
+        relative=${saved#"$backup"/}
+        file="$root/$relative"
+        # Do not overwrite a file recreated while an upgrade was interrupted.
+        if [ ! -e "$file" ] && [ ! -L "$file" ]; then
+            mkdir -p "$(dirname "$file")"
+            cp -a -- "$saved" "$file"
+        fi
+    done
+    rm -rf -- "$backup"
+fi
+
+#DEBHELPER#

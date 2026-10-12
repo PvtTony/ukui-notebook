@@ -26,17 +26,17 @@ Build-Depends: debhelper-compat (= 12),
                libkysdk-alm-dev,
 Standards-Version: 4.5.0
 Rules-Requires-Root: no
-Homepage: https://github.com/ukui/ukui-sidebar.git
-Vcs-Git: https://github.com/ukui/ukui-sidebar.git
-Vcs-Browser: https://github.com/ukui/ukui-sidebar
+Homepage: https://github.com/PvtTony/ukui-notebook
+Vcs-Git: https://github.com/PvtTony/ukui-notebook.git
+Vcs-Browser: https://github.com/PvtTony/ukui-notebook
 
 Package: ukui-notebook
 Architecture: any
 Depends: ${shlibs:Depends},
-         ${misc:Depends}
-Conflicts:ukui-sidebar( < 3.1.0-1-0037.2)
-Description: parallels toolbox for UKUI
- The ukui-sidebar is mainly used in the desktop operating system.
- It pops up from the right side of the desktop in the form of a tray,
- displaying some application notification messages and some cutting
- storage information.
+         ${misc:Depends},
+         libqt5sql5-sqlite
+Conflicts: ukui-sidebar (<< 3.1.0-1-0037.2)
+Description: desktop sticky notes for UKUI
+ Create, search and edit rich-text sticky notes on the UKUI desktop.
+ Notes support images, text formatting, colors, resizable editor windows
+ and automatic saving. A session D-Bus service provides note search.
